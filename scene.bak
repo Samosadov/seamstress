@@ -1,0 +1,522 @@
+#include <QtGui>
+#include <math.h>
+#include "scene.h"
+
+int num = 0;
+float pi = 3.1415926f, da = pi/180;
+bool carcass;
+
+tTable table1;
+tChair chair1;
+seamstress hum1;
+
+tScene::tScene(QWidget* parent) : QGLWidget(parent)
+{
+  nSca = 0.01f;
+
+  hum1.h = 165;
+  table1.x=75; table1.h1 = 80; table1.h2 = 30; table1.h3 = 29;
+  table1.pedal.h4=12; table1.pedal.h5=6;
+  chair1.h=50; chair1.x = table1.x - (table1.Sh + table1.h3 + 20) - 35;
+}
+
+void tScene::Calc()
+{
+  table1.pedal.h6 = table1.pedal.h5 + 10;
+  table1.pedal.l = table1.h3 + table1.Sh;
+  table1.w1 = table1.Sh + table1.h2 + 20;
+  table1.w2 = table1.Sh + table1.h3 + 20;
+
+  hum1.L[1] = hum1.h*0.25; //голень
+  hum1.L[2] = hum1.h*0.29; //бедро
+  hum1.L[4] = hum1.h*0.36; //корпус
+  hum1.L[5] = hum1.h*0.375; //шея+корпус
+  hum1.L[6] = hum1.h*0.07; //уровень глаз+шея
+  hum1.L[7] = hum1.h*0.1; //макушка
+  hum1.L[8] = hum1.h*0.04; //опять глаза
+  hum1.L[9] = hum1.h*0.18; //плечо
+  hum1.L[10] = hum1.h*0.16; //локоть
+
+  //лодыжка
+  /*hum1.joint[1].x = table1.x-table1.w2+table1.pedal.h4-10;
+  hum1.joint[1].y = table1.pedal.h5+5;
+  //бедро
+  hum1.joint[3].x = chair1.x - 10;
+  hum1.joint[3].y = chair1.h + 5;
+  //запястье
+  hum1.joint[10].y = table1.h1;
+*/
+}
+
+void tScene::defaultScene()
+{
+  hum1.h = 165;
+  table1.h1 = 80; table1.h2 = 30; table1.h3 = 29;
+  table1.pedal.h4=17; table1.pedal.h5=6;
+  chair1.h=50; chair1.x = table1.x - (table1.Sh + table1.h3 + 20) - 35;
+  Calc();
+  Calc1();
+
+  updateGL();
+}
+
+float tScene::R(float x1, float y1, float x2, float y2)
+{
+  return sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
+}
+
+void tScene::Calc1()
+{
+//голень
+hum1.joint[1].x = table1.x-table1.w2+table1.pedal.h4-8;
+hum1.joint[1].y = table1.pedal.h5+8;
+hum1.joint[1].f=false;
+//корпус
+hum1.joint[3].x = chair1.x-10;
+hum1.joint[3].y = chair1.h + 5;
+hum1.joint[3].f=false;
+//бедро
+float D = R(hum1.joint[1].x,hum1.joint[1].y,hum1.joint[3].x,hum1.joint[3].y);
+hum1.joint[3].a = acos((hum1.L[2]*hum1.L[2]-hum1.L[1]*hum1.L[1]+D*D)/(2*D*hum1.L[2]))-acos((hum1.joint[1].x-hum1.joint[3].x)/D);
+
+hum1.joint[2].x = hum1.joint[3].x+hum1.L[2]*cos(hum1.joint[3].a);
+hum1.joint[2].y = hum1.joint[3].y+hum1.L[2]*sin(hum1.joint[3].a);
+hum1.joint[2].f=false;
+hum1.joint[2].a = atan((hum1.joint[1].y-hum1.joint[2].y)/(hum1.joint[1].x-hum1.joint[2].x));
+
+hum1.joint[1].a = pi/2-hum1.joint[2].a;
+//шея
+hum1.joint[4].x = hum1.joint[3].x;
+hum1.joint[4].y = hum1.joint[3].y+hum1.L[4];
+hum1.joint[4].f=false;
+hum1.joint[4].a = pi/2;
+//уровень глаз
+hum1.joint[5].x = hum1.joint[3].x;
+hum1.joint[5].y = hum1.joint[3].y+hum1.L[5];
+hum1.joint[5].f=false;
+hum1.joint[5].a = pi/2;
+//иакушка
+hum1.joint[6].x = hum1.joint[5].x;
+hum1.joint[6].y = hum1.joint[5].y+hum1.L[6];
+hum1.joint[6].f=false;
+hum1.joint[6].a = pi/2;
+//опять глаза
+hum1.joint[7].x = hum1.joint[5].x;
+hum1.joint[7].y = hum1.joint[5].y+hum1.L[7];
+hum1.joint[7].f=false;
+hum1.joint[7].a = hum1.joint[6].a;
+//плечо
+hum1.joint[8].x = hum1.joint[6].x+hum1.L[8];
+hum1.joint[8].y = hum1.joint[6].y;
+hum1.joint[8].f=false;
+hum1.joint[8].a = hum1.joint[7].a-asin(hum1.L[8]/R(hum1.joint[5].x,hum1.joint[5].y,hum1.joint[8].x,hum1.joint[8].y));
+//запястье
+hum1.joint[10].x = table1.x-table1.w1;
+hum1.joint[10].y = table1.h1;
+hum1.joint[10].f=false;
+//локоть
+D = R(hum1.joint[4].x,hum1.joint[4].y,hum1.joint[10].x,hum1.joint[10].y);
+hum1.joint[9].a = -pi/2-(acos((hum1.L[9]*hum1.L[9]-hum1.L[10]*hum1.L[10]+D*D)/(2*D*hum1.L[9]))-acos((hum1.joint[10].x-hum1.joint[4].x)/D));
+
+hum1.joint[9].x = hum1.joint[4].x+hum1.L[9]*cos(hum1.joint[9].a);
+hum1.joint[9].y = hum1.joint[4].y+hum1.L[9]*sin(hum1.joint[9].a);
+hum1.joint[9].f=false;
+
+hum1.joint[10].a = -pi+atan((hum1.joint[10].y-hum1.joint[9].y)/(hum1.joint[10].x-hum1.joint[9].x));
+}
+
+void tScene::MoveJoint(int k, float dx, float dy, float dt)
+{
+  float r1, t;
+
+  switch (k){
+    case 1: {
+        hum1.joint[1].x+=dx;
+        hum1.joint[1].y+=dy;
+
+        float D = R(hum1.joint[1].x,hum1.joint[1].y,hum1.joint[3].x,hum1.joint[3].y);
+        hum1.joint[3].a = acos((hum1.L[2]*hum1.L[2]-hum1.L[1]*hum1.L[1]+D*D)/(2*D*hum1.L[2]))-acos((hum1.joint[1].x-hum1.joint[3].x)/D);
+
+        hum1.joint[2].x = hum1.joint[3].x+hum1.L[2]*cos(hum1.joint[3].a);
+        hum1.joint[2].y = hum1.joint[3].y+hum1.L[2]*sin(hum1.joint[3].a);
+        hum1.joint[2].f=false;
+        hum1.joint[2].a = atan((hum1.joint[1].y-hum1.joint[2].y)/(hum1.joint[1].x-hum1.joint[2].x));
+
+        hum1.joint[1].a = pi/2-hum1.joint[2].a;
+
+    } break;
+    case 3: {
+        if ((dx!=0)&&(hum1.joint[3].x+dx>chair1.x-chair1.w)&&(hum1.joint[3].x+dx<chair1.x+chair1.w)) {
+            hum1.joint[3].x+=dx;
+            for (int i=4; i<=10; i++) hum1.joint[i].x+=dx;
+          }
+        if ((dy!=0)){
+            hum1.joint[3].y+=dy;
+            for (int i=4; i<=8; i++) hum1.joint[i].y+=dy;
+          }
+
+        float D = R(hum1.joint[1].x,hum1.joint[1].y,hum1.joint[3].x,hum1.joint[3].y);
+        hum1.joint[3].a = acos((hum1.L[2]*hum1.L[2]-hum1.L[1]*hum1.L[1]+D*D)/(2*D*hum1.L[2]))-acos((hum1.joint[1].x-hum1.joint[3].x)/D);
+
+        hum1.joint[2].x = hum1.joint[3].x+hum1.L[2]*cos(hum1.joint[3].a);
+        hum1.joint[2].y = hum1.joint[3].y+hum1.L[2]*sin(hum1.joint[3].a);
+        hum1.joint[2].f=false;
+        hum1.joint[2].a = atan((hum1.joint[1].y-hum1.joint[2].y)/(hum1.joint[1].x-hum1.joint[2].x));
+
+        hum1.joint[1].a = pi/2-hum1.joint[2].a;
+
+    } break;
+    case 4: case 5: {
+        if ((dx>0)&&(hum1.joint[k].a>pi/4)) t = -da;
+        if ((dx<0)&&(hum1.joint[k].a<pi*0.75)) t = da;
+        if ((dy>0)&&(hum1.joint[k].a<pi/2)) t = da;
+        if ((dy>0)&&(hum1.joint[k].a>pi/2)) t = -da;
+        if ((dy<0)&&(hum1.joint[k].a<pi*0.75)&&(hum1.joint[k].a>pi/2)) t = da;
+        if ((dy<0)&&(hum1.joint[k].a>pi/4)&&(hum1.joint[k].a<pi/2)) t = -da;
+
+        for (int i=4; i<=8; i++) {
+            if (i<6) r1 = hum1.L[i];
+            else r1 = R(hum1.joint[3].x,hum1.joint[3].y,hum1.joint[i].x,hum1.joint[i].y);
+            hum1.joint[i].a+=t;
+            hum1.joint[i].x = hum1.joint[3].x+r1*cos(hum1.joint[i].a);
+            hum1.joint[i].y = hum1.joint[3].y+r1*sin(hum1.joint[i].a);
+        }
+
+        t *= hum1.L[k];
+
+        hum1.joint[10].a+=t/hum1.L[10];
+        hum1.joint[9].x=hum1.joint[10].x+hum1.L[10]*cos(hum1.joint[10].a);
+        hum1.joint[9].y=hum1.joint[10].y+hum1.L[10]*sin(hum1.joint[10].a);
+        hum1.joint[9].a=atan((hum1.joint[9].y-hum1.joint[4].y)/(hum1.joint[9].x-hum1.joint[4].x));
+    } break;
+    case 6: case 7: case 8: {
+        for (int i=k; i<=8; i++) {
+            if (i<8) r1 = hum1.L[i];
+            else r1 = R(hum1.joint[5].x,hum1.joint[5].y,hum1.joint[i].x,hum1.joint[i].y);
+            hum1.joint[i].a+=t;
+            hum1.joint[i].x = hum1.joint[5].x+r1*cos(hum1.joint[i].a);
+            hum1.joint[i].y = hum1.joint[5].y+r1*sin(hum1.joint[i].a);
+          }
+
+    } break;
+    case 9: {
+        if ((dx>0)&&(hum1.joint[k].a<0)&&(R(hum1.joint[4].x,hum1.joint[4].y,hum1.joint[k+1].x,hum1.joint[k+1].y)<hum1.L[k]+hum1.L[k+1])) hum1.joint[k].a+=da;
+        if ((dx<0)&&(hum1.joint[k].a>-pi*0.75)) hum1.joint[k].a-=da;
+        if ((dy>0)&&(hum1.joint[k].a<0)&&(R(hum1.joint[4].x,hum1.joint[4].y,hum1.joint[k+1].x,hum1.joint[k+1].y)<hum1.L[k]+hum1.L[k+1])) hum1.joint[k].a+=da;
+        if ((dy<0)&&(hum1.joint[k].a>-pi/2)) hum1.joint[k].a-=da;
+
+        hum1.joint[k].x = hum1.joint[4].x+hum1.L[k]*cos(hum1.joint[k].a);
+        hum1.joint[k].y = hum1.joint[4].y+hum1.L[k]*sin(hum1.joint[k].a);
+
+        t = da*hum1.L[k];
+        if ((dx<0)||(dy<0)) t=-t;
+        hum1.joint[k+1].x += t;
+        hum1.joint[k+1].a=-pi+atan((hum1.joint[10].y-hum1.joint[9].y)/(hum1.joint[10].x-hum1.joint[9].x));
+
+    } break;
+    case 10: {
+        if ((dx>0)&&(R(hum1.joint[4].x,hum1.joint[4].y,hum1.joint[k].x,hum1.joint[k].y)<hum1.L[k]+hum1.L[k-1])||(dx<0)&&(hum1.joint[k-1].a>-pi*0.75)) hum1.joint[k].x+=dx;
+
+        hum1.joint[k-1].a+=dx/hum1.L[k-1];
+
+        hum1.joint[k-1].x = hum1.joint[4].x+hum1.L[k-1]*cos(hum1.joint[k-1].a);
+        hum1.joint[k-1].y = hum1.joint[4].y+hum1.L[k-1]*sin(hum1.joint[k-1].a);
+
+        hum1.joint[k].a=-pi+atan((hum1.joint[10].y-hum1.joint[9].y)/(hum1.joint[10].x-hum1.joint[9].x));
+        //dy
+    } break;
+
+  }
+}
+
+void tScene::initializeGL()
+{
+   qglClearColor(Qt::black);
+   glEnable(GL_DEPTH_TEST);
+   glShadeModel(GL_FLAT);
+   glEnable(GL_CULL_FACE);
+
+   Calc();
+   Calc1();
+}
+
+void tScene::resizeGL(int nWidth, int nHeight)
+{
+   glMatrixMode(GL_PROJECTION);
+   glLoadIdentity();
+
+   GLfloat ratio=(GLfloat)nHeight/(GLfloat)nWidth;
+
+   if (nWidth>=nHeight)
+      glOrtho(-1.0/ratio, 1.0/ratio, -1.0, 1.0, -10.0, 1.0);
+   else
+      glOrtho(-1.0, 1.0, -1.0*ratio, 1.0*ratio, -10.0, 1.0);
+
+   glViewport(0, 0, (GLint)nWidth, (GLint)nHeight);
+}
+
+void tScene::paintGL()
+{
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity();
+
+  glTranslatef(0.0f,-0.75f,0.0f);
+  glScalef(nSca,nSca,nSca);
+
+//Стол
+  glLineWidth(3.0f);
+  glColor4f(0.0f,0.0f,1.0f,1.0f);
+  glBegin(GL_LINES); //нижняя перекладина
+    glVertex2f(table1.x,0);
+    glVertex2f(table1.x,8);
+
+    glVertex2f(table1.x-table1.w2,0);
+    glVertex2f(table1.x-table1.w2,8);
+
+    glVertex2f(table1.x,8);
+    glVertex2f(table1.x-table1.w2,8);
+
+    glVertex2f(table1.x,0);
+    glVertex2f(table1.x-table1.w2,0);
+  glEnd();
+  glBegin(GL_LINES); //вертикальная стойка
+    glVertex2f(table1.x-20,8);
+    glVertex2f(table1.x-20,table1.h1-4);
+
+    glVertex2f(table1.x-table1.Sh-20,8);
+    glVertex2f(table1.x-table1.Sh-20,table1.h1-4);
+  glEnd();
+  glBegin(GL_LINES); //крышка
+    glVertex2f(table1.x,table1.h1);
+    glVertex2f(table1.x,table1.h1-4);
+
+    glVertex2f(table1.x,table1.h1);
+    glVertex2f(table1.x-table1.w1,table1.h1);
+
+    glVertex2f(table1.x-table1.w1,table1.h1);
+    glVertex2f(table1.x-table1.w1,table1.h1-4);
+
+    glVertex2f(table1.x-table1.w1,table1.h1-4);
+    glVertex2f(table1.x,table1.h1-4);
+  glEnd();
+  glColor4f(0.0f,1.0f,0.0f,1.0f);//педаль
+  glLineWidth(2.0f);
+  glBegin(GL_LINES);
+    glVertex2f(table1.x-table1.w2+table1.pedal.h4,table1.pedal.h5);
+    glVertex2f(table1.x-table1.w2+table1.pedal.h4-11,table1.pedal.h5);
+
+    glVertex2f(table1.x-table1.w2+table1.pedal.h4,table1.pedal.h5);
+    glVertex2f(table1.x-table1.w2+table1.pedal.h4+8,table1.pedal.h6);
+
+    glVertex2f(table1.x-table1.w2+table1.pedal.h4-11,table1.pedal.h5);
+    glVertex2f(table1.x-table1.w2+table1.pedal.h4+8,table1.pedal.h6);
+  glEnd();
+
+//Стул
+  glLineWidth(5.0f);
+  glColor4f(0.0f,0.0f,1.0f,1.0f);
+  glBegin(GL_LINES);
+    glVertex2f(chair1.x,0);
+    glVertex2f(chair1.x,chair1.h);
+  glEnd();
+  glBegin(GL_LINES);
+    glVertex2f(chair1.x-10,0);
+    glVertex2f(chair1.x,10);
+  glEnd();
+  glBegin(GL_LINES);
+    glVertex2f(chair1.x,10);
+    glVertex2f(chair1.x+10,0);
+  glEnd();
+  glBegin(GL_LINES);
+    glVertex2f(chair1.x-chair1.w,chair1.h);
+    glVertex2f(chair1.x+chair1.w,chair1.h);
+  glEnd();
+
+//Швея
+  glLineWidth(2.0f);
+  glColor4f(1.0f,0.0f,0.0f,1.0f);
+  for (int i=1; i<7; i++)//carcass
+  {
+    glBegin(GL_LINES);
+      glVertex2f(hum1.joint[i].x,hum1.joint[i].y);
+      glVertex2f(hum1.joint[i+1].x,hum1.joint[i+1].y);
+    glEnd();
+  }
+  glBegin(GL_LINES);
+    glVertex2f(hum1.joint[6].x,hum1.joint[6].y);
+    glVertex2f(hum1.joint[8].x,hum1.joint[8].y);
+  glEnd();
+  glBegin(GL_LINES);
+    glVertex2f(hum1.joint[4].x,hum1.joint[4].y);
+    glVertex2f(hum1.joint[9].x,hum1.joint[9].y);
+  glEnd();
+  glBegin(GL_LINES);
+    glVertex2f(hum1.joint[9].x,hum1.joint[9].y);
+    glVertex2f(hum1.joint[10].x,hum1.joint[10].y);
+  glEnd();
+  glBegin(GL_LINES);//foot
+    glVertex2f(hum1.joint[1].x,hum1.joint[1].y);
+    glVertex2f(table1.x-table1.w2+table1.pedal.h4-11,table1.pedal.h5);
+
+    glVertex2f(hum1.joint[1].x,hum1.joint[1].y);
+    glVertex2f(table1.x-table1.w2+table1.pedal.h4+8,table1.pedal.h6);
+
+    glVertex2f(table1.x-table1.w2+table1.pedal.h4+8,table1.pedal.h6);
+    glVertex2f(table1.x-table1.w2+table1.pedal.h4-11,table1.pedal.h5);
+  glEnd();
+  glBegin(GL_LINES);//hand
+    glVertex2f(hum1.joint[10].x,hum1.joint[10].y);
+    glVertex2f(hum1.joint[10].x+12,hum1.joint[10].y);
+
+    glVertex2f(hum1.joint[10].x,hum1.joint[10].y);
+    glVertex2f(hum1.joint[10].x+5,hum1.joint[10].y+3);
+
+    glVertex2f(hum1.joint[10].x+5,hum1.joint[10].y+3);
+    glVertex2f(hum1.joint[10].x+12,hum1.joint[10].y);
+  glEnd();
+  glPointSize(8.0f);//joints
+  for (int i=1; i<=10; i++){
+      if (hum1.joint[i].f) glColor4f(1.0f,1.0f,0.5f,1.0f);
+      else glColor4f(0.8f,0.5f,0.0f,1.0f);
+//      if (i==9) glColor4f(1.0f,1.0f,1.0f,1.0f);
+    glBegin(GL_POINTS);
+      glVertex2f(hum1.joint[i].x,hum1.joint[i].y);
+    glEnd();
+    }
+}
+
+void tScene::mouseMoveEvent(QMouseEvent *pe)
+{
+}
+
+void tScene::mousePressEvent(QMouseEvent* pe)
+{
+//  ptrMousePosition = pe.posF();
+//  if (num<5){ num++;
+//  xb[num]=(GLfloat)ptrMousePosition.x;
+//  yb[num]=(GLfloat)ptrMousePosition.y;}
+}
+
+void tScene::mouseReleaseEvent(QMouseEvent* pe)
+{
+//  ptrMousePosition = pe.pos();
+//  if (num<5){
+//  xe[num]=(GLfloat)ptrMousePosition.x;
+//  ye[num]=(GLfloat)ptrMousePosition.y;}
+
+//  updateGL();
+}
+
+void tScene::keyPressEvent(QKeyEvent* pe)
+{
+  switch (pe->key()){
+    case Qt::Key_Tab:{
+        if (num>0) hum1.joint[num].f=false;
+        if (num<10) num++;
+        else num=1;
+        hum1.joint[num].f=true;
+        carcass=true;
+        updateGL();
+    } break;
+    case Qt::Key_Enter:{
+      if (num>0) {
+        hum1.joint[num].f=false;
+        num=0;
+      }
+      carcass=false;
+      updateGL();
+    } break;
+    case Qt::Key_Escape:
+      this->close();
+      break;
+    case Qt::Key_Space:
+      defaultScene();
+      break;
+    case Qt::Key_Plus:{
+      if (hum1.h<200) hum1.h+=1;
+      Calc();
+      Calc1();
+      updateGL();
+    } break;
+    case Qt::Key_Minus:{
+      if (hum1.h>140) hum1.h-=1;
+      Calc();
+      Calc1();
+      updateGL();
+    } break;
+    case Qt::Key_Down:{
+      if (carcass) {if ((num!=1)&&(num!=3)&&(num!=10)) MoveJoint(num,0,-1,0);}
+      else if (chair1.h>chair1.Hmin) {chair1.h-=1; MoveJoint(3,0,-1,0);}
+      updateGL();
+    } break;
+    case Qt::Key_Up:{
+      if (carcass) {if ((num!=1)&&(num!=3)&&(num!=10)) MoveJoint(num,0,1,0);}
+      else if (chair1.h<chair1.Hmax) {chair1.h+=1; MoveJoint(3,0,1,0);}
+      updateGL();
+    } break;
+    case Qt::Key_Left:{
+      if (carcass) {if ((num!=1)) MoveJoint(num,-1,0,0);}
+      else if (chair1.x>table1.x-table1.w1-70+chair1.w) {chair1.x-=1; MoveJoint(3,-1,0,0);}
+      updateGL();
+    } break;
+    case Qt::Key_Right:{
+      if (carcass) {if ((num!=1)) MoveJoint(num,1,0,0);}
+      else if (chair1.x<table1.x-table1.w1-5) {chair1.x+=1; MoveJoint(3,1,0,0);}
+      updateGL();
+    } break;
+    //метаморфозы стола
+    case Qt::Key_A:{
+      if (table1.h1<table1.Hmax) {table1.h1+=1; MoveJoint(10,0,1,0);}
+      updateGL();
+    } break;
+    case Qt::Key_S:{
+      if (table1.h2<35) {table1.h2+=0.5; MoveJoint(10,0.5,0,0);}
+      Calc();
+      updateGL();
+    } break;
+    case Qt::Key_D:{
+      if (table1.h3<30) table1.h3+=0.5;
+      Calc();
+      updateGL();
+    } break;
+    case Qt::Key_Z:{
+      if (table1.h1>table1.Hmin) {table1.h1-=1; MoveJoint(10,0,-1,0);}
+      Calc();
+      updateGL();
+    } break;
+    case Qt::Key_X:{
+      if (table1.h2>19) {table1.h2-=0.5;  MoveJoint(10,-0.5,0,0);}
+      Calc();
+      updateGL();
+    } break;
+    case Qt::Key_C:{
+      if (table1.h3>24) table1.h3-=0.5;
+      Calc();
+      updateGL();
+    } break;
+    //движение педали
+    case Qt::Key_F:{
+      if (table1.pedal.h4>table1.pedal.minh4) {table1.pedal.h4-=0.5; MoveJoint(1,-0.5,0,0);}
+      Calc();
+      updateGL();
+    } break;
+    case Qt::Key_G:{
+      if (table1.pedal.h4<table1.pedal.l) {table1.pedal.h4+=0.5; MoveJoint(1,0.5,0,0);}
+      Calc();
+      updateGL();
+    } break;
+    case Qt::Key_V:{
+      if (table1.pedal.h5>2) {table1.pedal.h5-=0.5; MoveJoint(1,0,-0.5,0);}
+      Calc();
+      updateGL();
+    } break;
+    case Qt::Key_B:{
+      if (table1.pedal.h5<12) {table1.pedal.h5+=0.5; MoveJoint(1,0,0.5,0);}
+      Calc();
+      updateGL();
+    } break;
+
+  }
+}
